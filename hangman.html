@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Hangman Game</title>
+  <style>
+    @keyframes fadeIn {
+      from { opacity: 0; transform: scale(0.95); }
+      to { opacity: 1; transform: scale(1); }
+    }
+
+    body {
+      background: url('https://images.unsplash.com/photo-1507525428034-b723cf961d3e') no-repeat center center fixed;
+      background-size: cover;
+      position: relative;
+      min-height: 100vh;
+      padding: 0;
+      margin: 0;
+      font-family: Arial, sans-serif;
+    }
+
+    body::before {
+      content: "";
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(255, 255, 255, 0.6); /* Slightly transparent to give a light overlay */
+      z-index: 0;
+    }
+
+    body > * {
+      position: relative;
+      z-index: 1;
+    }
+
+    h1 {
+      text-align: center;
+      font-size: 2rem;
+      margin-top: 50px;
+      color: #fff;
+    }
+
+    #hangman {
+      white-space: pre;
+      font-family: monospace;
+      padding: 15px;
+      display: block;
+      margin: 20px auto;
+      border-radius: 10px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      animation: fadeIn 0.5s ease;
+      text-align: center;
+      width: 100%;
+      max-width: 600px;
+      background: rgba(255, 255, 255, 0.3); /* Semi-transparent background */
+    }
+
+    #word {
+      font-size: 2.5rem;
+      letter-spacing: 14px;
+      margin-bottom: 20px;
+      color: #fff;
+      text-align: center;
+    }
+
+    #letters {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      margin: 20px auto;
+      max-width: 700px;
+    }
+
+    #letters button {
+      font-size: 1.1rem;
+      padding: 12px 16px;
+      border: none;
+      border-radius: 10px;
+      background-image: linear-gradient(to right, #4facfe 0%, #00f2fe 100%);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.3s ease;
+    }
+
+    #letters button:hover:not(:disabled) {
+      transform: scale(1.05);
+      background-image: linear-gradient(to right, #43e97b 0%, #38f9d7 100%);
+    }
+
+    #letters button:disabled {
+      background-color: #bbb;
+      cursor: not-allowed;
+      opacity: 0.7;
+    }
+
+    #message {
+      font-size: 1.6rem;
+      color: #fff;
+      margin-top: 20px;
+      font-weight: bold;
+      animation: fadeIn 0.6s ease;
+      text-align: center;
+    }
+
+    #restart {
+      display: block;
+      margin: 30px auto;
+      padding: 12px 22px;
+      font-size: 1rem;
+      border: none;
+      border-radius: 10px;
+      background-image: linear-gradient(to right, #2193b0, #6dd5ed);
+      color: white;
+      cursor: pointer;
+      transition: transform 0.3s, background 0.3s ease;
+    }
+
+    #restart:hover {
+      background-image: linear-gradient(to right, #56ccf2, #2f80ed);
+      transform: scale(1.05);
+    }
+  </style>
+</head>
+<body>
+  <h1>Hangman Game</h1>
+  <div id="hangman"></div>
+  <div id="word"></div>
+  <div id="letters"></div>
+  <div id="message"></div>
+  <button id="restart" onclick="initGame()">Restart Game</button>
+
+  <script>
+    const words = [
+      "apple", "banana", "orange", "grape", "strawberry",
+      "pineapple", "watermelon", "kiwi", "mango", "peach",
+      "diamond", "blueberry", "blackberry", "cherry", "coconut",
+      "lemon", "lime", "papaya", "pear", "innovation"
+    ];
+
+    let selectedWord = "";
+    let guessedWord = [];
+    let tries = 0;
+    const maxTries = 6;
+    const guessedLetters = new Set();
+
+    const hangmanStages = [
+      `  +---+\n  |   |\n      |\n      |\n      |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n      |\n      |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n  |   |\n      |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n /|   |\n      |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n /|\\  |\n      |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n /|\\  |\n /    |\n      |\n=========`,
+      `  +---+\n  |   |\n  O   |\n /|\\  |\n / \\  |\n      |\n=========`
+    ];
+
+    function initGame() {
+      selectedWord = words[Math.floor(Math.random() * words.length)];
+      guessedWord = Array(selectedWord.length).fill("_");
+      tries = 0;
+      guessedLetters.clear();
+      document.getElementById("hangman").textContent = hangmanStages[0];
+      document.getElementById("word").textContent = guessedWord.join(" ");
+      document.getElementById("message").textContent = "";
+      generateLetterButtons();
+      document.getElementById("restart").style.display = "none"; // Hide restart button initially
+    }
+
+    function generateLetterButtons() {
+      const container = document.getElementById("letters");
+      container.innerHTML = "";
+      for (let i = 97; i <= 122; i++) {
+        const letter = String.fromCharCode(i);
+        const button = document.createElement("button");
+        button.textContent = letter;
+        button.onclick = () => handleGuess(letter, button);
+        container.appendChild(button);
+      }
+    }
+
+    function handleGuess(letter, button = null) {
+      if (guessedLetters.has(letter)) return;
+      guessedLetters.add(letter);
+      if (button) button.disabled = true;
+      else {
+        const btn = [...document.querySelectorAll("#letters button")].find(b => b.textContent === letter);
+        if (btn) btn.disabled = true;
+      }
+
+      let found = false;
+      for (let i = 0; i < selectedWord.length; i++) {
+        if (selectedWord[i] === letter) {
+          guessedWord[i] = letter;
+          found = true;
+        }
+      }
+
+      document.getElementById("word").textContent = guessedWord.join(" ");
+
+      if (!found) {
+        tries++;
+        document.getElementById("hangman").textContent = hangmanStages[tries];
+      }
+
+      if (guessedWord.join("") === selectedWord) {
+        document.getElementById("message").textContent = `🎉 You win! The word was: ${selectedWord}`;
+        disableAllButtons();
+        document.getElementById("restart").style.display = "block"; // Show restart button
+      } else if (tries === maxTries) {
+        document.getElementById("message").textContent = `💀 Game Over! The word was: ${selectedWord}`;
+        disableAllButtons();
+        document.getElementById("restart").style.display = "block"; // Show restart button
+      }
+    }
+
+    function disableAllButtons() {
+      document.querySelectorAll("#letters button").forEach(btn => btn.disabled = true);
+    }
+
+    // Keyboard support
+    document.addEventListener("keydown", (e) => {
+      const letter = e.key.toLowerCase();
+      if (/^[a-z]$/.test(letter)) {
+        handleGuess(letter);
+      }
+    });
+
+    initGame();
+  </script>
+</body>
+</html>
